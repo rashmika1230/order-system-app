@@ -1,0 +1,25 @@
+name: order-system
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: order-system-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "3307:3306"            # laptop port 3307 -> container port 3306
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # 127.0.0.1 forces a TCP check, so it only passes once MySQL has
+      # finished first-time setup and is really accepting connections
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
