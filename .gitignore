@@ -1,0 +1,22 @@
+# Build output
+target/
+out/
+
+# IntelliJ
+.idea/
+*.iml
+*.iws
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets and local environment
+.env
+*.pem
+
+# Logs
+*.log
