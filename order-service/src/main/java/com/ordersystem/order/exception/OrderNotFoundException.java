@@ -5,7 +5,7 @@ public class OrderNotFoundException extends RuntimeException{
     private final Long orderId;
 
     public OrderNotFoundException(Long id) {
-        super("Order not found with id: " + id + " was not found");
+        super("Order with id: " + id + " was not found");
         this.orderId = id;
     }
 

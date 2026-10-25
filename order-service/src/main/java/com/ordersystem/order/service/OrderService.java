@@ -1,6 +1,9 @@
 package com.ordersystem.order.service;
 
 import com.ordersystem.order.client.ProductClient;
+import com.ordersystem.order.client.dto.ReserveStockRequest;
+import com.ordersystem.order.client.dto.ReserveStockResponse;
+import com.ordersystem.order.client.dto.StockConflictDetails;
 import com.ordersystem.order.dto.*;
 import com.ordersystem.order.entity.Order;
 import com.ordersystem.order.entity.OrderStatus;
@@ -19,7 +22,7 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 @Service
-public class OrderService {     // ← class-level @Transactional නැහැ! (Part 5)
+public class OrderService {
 
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 

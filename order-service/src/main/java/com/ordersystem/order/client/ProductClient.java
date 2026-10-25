@@ -1,7 +1,7 @@
 package com.ordersystem.order.client;
 
-import com.ordersystem.order.dto.ReserveStockRequest;
-import com.ordersystem.order.dto.ReserveStockResponse;
+import com.ordersystem.order.client.dto.ReserveStockRequest;
+import com.ordersystem.order.client.dto.ReserveStockResponse;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.service.annotation.HttpExchange;

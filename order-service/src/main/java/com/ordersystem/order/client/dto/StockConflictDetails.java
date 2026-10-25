@@ -1,4 +1,4 @@
-package com.ordersystem.order.dto;
+package com.ordersystem.order.client.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 

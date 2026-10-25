@@ -1,4 +1,4 @@
-package com.ordersystem.order.dto;
+package com.ordersystem.order.client.dto;
 
 public record ReserveStockRequest(Integer quantity) {
 }

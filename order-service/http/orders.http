@@ -1,0 +1,52 @@
+### 1. Create an order (expect 201 + Location header)
+POST http://localhost:8082/api/orders
+Content-Type: application/json
+
+{
+    "productId": 1,
+    "quantity": 2
+}
+
+### 1b. Check product 1 stock went down by 2 (product-service)
+GET http://localhost:8081/api/products/1
+
+### 2. Get the order (expect 200, totalPrice = 2 x 15500.00 = 31000.00)
+GET http://localhost:8082/api/orders/1
+
+### 3. Order that does not exist (expect 404)
+GET http://localhost:8082/api/orders/999
+
+### 4. Product that does not exist (expect 404, translated from product-service)
+POST http://localhost:8082/api/orders
+Content-Type: application/json
+
+{
+    "productId": 999,
+    "quantity": 1
+}
+
+### 5. Not enough stock (expect 409 with availableStock)
+POST http://localhost:8082/api/orders
+Content-Type: application/json
+
+{
+    "productId": 4,
+    "quantity": 100
+}
+
+### 6. Invalid body (expect 400 with field errors)
+POST http://localhost:8082/api/orders
+Content-Type: application/json
+
+{
+    "quantity": 0
+}
+
+### 7. STOP product-service first, then run this (expect 503)
+POST http://localhost:8082/api/orders
+Content-Type: application/json
+
+{
+    "productId": 1,
+    "quantity": 1
+}

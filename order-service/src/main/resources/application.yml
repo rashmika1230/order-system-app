@@ -10,7 +10,7 @@ spring:
     hibernate:
       ddl-auto: validate
   http:
-    service client:
+    serviceclient:
       product-service:              # client group name, used in HttpClientConfig
         base-url: http://localhost:8081
         connect-timeout: 2s         # time to open the connection

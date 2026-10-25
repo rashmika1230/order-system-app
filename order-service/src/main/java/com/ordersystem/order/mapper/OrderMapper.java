@@ -3,7 +3,7 @@ package com.ordersystem.order.mapper;
 import com.ordersystem.order.dto.OrderResponse;
 import com.ordersystem.order.entity.Order;
 
-public class OrderMapper {
+public final class OrderMapper {
     private OrderMapper() {
     }
 
