@@ -21,7 +21,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleException(Exception ex){
         logger.error("An unexpected error occurred", ex);
-        return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error occurred.");
+        problem.setTitle("Internal server error");
+        return problem;
     }
 
     @ExceptionHandler(ProductNotFoundException.class)
