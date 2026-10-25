@@ -13,8 +13,8 @@ public record CreateProductRequest(
     String description,
 
     @NotNull(message = "Price is required")
-    @DecimalMin(value = "0.01", message = "Price must be greater than 0.01")
-    @Digits(integer = 8, fraction = 2, message = "Price must have 2 digits after the decimal point")
+    @DecimalMin(value = "0.01", message = "Price must be at least 0.01")
+    @Digits(integer = 8, fraction = 2, message = "Price must have at most 8 digits and 2 decimals")
     BigDecimal price,
 
     @NotNull(message = "Stock is required")

@@ -6,5 +6,5 @@ import jakarta.validation.constraints.Positive;
 public record ReserveStockRequest(
     @NotNull(message = "Product ID is required")
     @Positive(message = "Quantity must be greater than 0")
-    int quantity) {
+    Integer quantity) {
 }
