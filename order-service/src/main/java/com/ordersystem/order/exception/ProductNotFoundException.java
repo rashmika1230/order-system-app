@@ -1,4 +1,4 @@
-package exception;
+package com.ordersystem.order.exception;
 
 public class ProductNotFoundException extends RuntimeException{
 

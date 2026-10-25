@@ -1,4 +1,4 @@
-package exception;
+package com.ordersystem.order.exception;
 
 public class InsufficientStockException extends RuntimeException{
 
