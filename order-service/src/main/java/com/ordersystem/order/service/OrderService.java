@@ -4,15 +4,16 @@ import com.ordersystem.order.client.ProductClient;
 import com.ordersystem.order.client.dto.ReserveStockRequest;
 import com.ordersystem.order.client.dto.ReserveStockResponse;
 import com.ordersystem.order.client.dto.StockConflictDetails;
-import com.ordersystem.order.dto.*;
+import com.ordersystem.order.dto.CreateOrderRequest;
+import com.ordersystem.order.dto.OrderResponse;
 import com.ordersystem.order.entity.Order;
 import com.ordersystem.order.entity.OrderStatus;
-import com.ordersystem.order.mapper.OrderMapper;
-import com.ordersystem.order.repository.OrderRepository;
 import com.ordersystem.order.exception.InsufficientStockException;
 import com.ordersystem.order.exception.OrderNotFoundException;
 import com.ordersystem.order.exception.ProductNotFoundException;
 import com.ordersystem.order.exception.ProductServiceUnavailableException;
+import com.ordersystem.order.mapper.OrderMapper;
+import com.ordersystem.order.repository.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -34,7 +35,7 @@ public class OrderService {
         this.productClient = productClient;
     }
 
-    public OrderResponse createOrder(CreateOrderRequest request) {      // ← @Transactional නැහැ!
+    public OrderResponse createOrder(CreateOrderRequest request) {
 
         ReserveStockResponse reserveStock = reserveStock(request.productId(), request.quantity());
 
