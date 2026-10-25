@@ -22,6 +22,13 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
+/**
+ * Deliberately NO class-level @Transactional.
+ * createOrder() makes a network call to product-service. Wrapping it in a transaction
+ * would hold a database connection for the whole HTTP call (up to the 3s read timeout).
+ * Under load, slow product-service responses would then exhaust the connection pool
+ * and break order-service completely, even for reads.
+ */
 @Service
 public class OrderService {
 
@@ -37,8 +44,15 @@ public class OrderService {
 
     public OrderResponse createOrder(CreateOrderRequest request) {
 
+        // 1. Reserve stock first (network call, outside any database transaction)
         ReserveStockResponse reserveStock = reserveStock(request.productId(), request.quantity());
 
+        // 2. Save the order with the price snapshot from product-service.
+        //    save() runs in its own short transaction.
+        //
+        // KNOWN LIMITATION: if this save fails after the reservation succeeded,
+        // the reserved stock is lost. A production system would fix this with a
+        // compensating "release stock" call or the Saga pattern.
         Order order = new Order(
             request.productId(),
             request.quantity(),
