@@ -1,0 +1,14 @@
+# Build output from your laptop: the image builds its own
+target/
+
+# IDE and OS files
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Not needed inside the image
+http/
+HELP.md
+*.md
