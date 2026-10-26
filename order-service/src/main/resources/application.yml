@@ -12,7 +12,7 @@ spring:
   http:
     serviceclient:
       product-service:              # client group name, used in HttpClientConfig
-        base-url: http://localhost:8081
+        base-url: ${PRODUCT_SERVICE_URL:http://localhost:8081}
         connect-timeout: 2s         # time to open the connection
         read-timeout: 3s            # time to wait for the response
 
