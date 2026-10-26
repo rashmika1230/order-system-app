@@ -1,5 +1,13 @@
 name: order-system
 
+# Shared health check for the Spring Boot services (a YAML anchor, reused below)
+x-app-healthcheck: &app-healthcheck
+  test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+  interval: 10s
+  timeout: 3s
+  retries: 12
+  start_period: 40s
+
 services:
   mysql:
     image: mysql:8.4
@@ -19,6 +27,53 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    restart: unless-stopped
+
+  product-service:
+    profiles: ["app"]
+    build: ./product-service
+    image: order-system/product-service:local
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/product_db
+      SPRING_DATASOURCE_USERNAME: product_user
+      SPRING_DATASOURCE_PASSWORD: product_pass
+      LOGGING_LEVEL_ORG_HIBERNATE_SQL: info
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck: *app-healthcheck
+    mem_limit: 512m
+    restart: unless-stopped
+
+  order-service:
+    profiles: ["app"]
+    build: ./order-service
+    image: order-system/order-service:local
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/order_db
+      SPRING_DATASOURCE_USERNAME: order_user
+      SPRING_DATASOURCE_PASSWORD: order_pass
+      PRODUCT_SERVICE_URL: http://product-service:8080
+      LOGGING_LEVEL_ORG_HIBERNATE_SQL: info
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck: *app-healthcheck
+    mem_limit: 512m
+    restart: unless-stopped
+
+  api-gateway:
+    profiles: ["app"]
+    build: ./api-gateway
+    image: order-system/api-gateway:local
+    environment:
+      PRODUCT_SERVICE_URL: http://product-service:8080
+      ORDER_SERVICE_URL: http://order-service:8080
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_GATEWAY: info
+    ports:
+      - "8080:8080"            # the ONLY application port published to your laptop
+    healthcheck: *app-healthcheck
+    mem_limit: 384m
     restart: unless-stopped
 
 volumes:

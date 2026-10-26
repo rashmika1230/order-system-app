@@ -28,3 +28,16 @@ Prerequisites: Java 17, Docker Desktop.
 
 Only `/api/products`, `/api/products/{id}`, `/api/orders` and `/api/orders/{id}` are public.
 The stock reservation endpoint is internal (order-service → product-service only).
+
+### Run everything in Docker
+
+Requires only Docker Desktop (no local Java needed).
+
+    docker compose --profile app up -d --build
+
+The API is available through the gateway at `http://localhost:8080`.
+product-service and order-service are not exposed outside the Docker network.
+
+Stop everything (data is kept in the `mysql-data` volume):
+
+    docker compose --profile app down
