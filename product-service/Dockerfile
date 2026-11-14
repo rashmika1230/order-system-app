@@ -13,7 +13,8 @@ RUN cp target/*.jar application.jar \
 
 FROM eclipse-temurin:17-jre-alpine
 
-RUN addgroup -S spring && adduser -S spring -G spring
+# Fixed numeric IDs: Kubernetes can only verify runAsNonRoot when the image user is numeric
+RUN addgroup -S -g 10001 spring && adduser -S -u 10001 -G spring spring
 
 WORKDIR /application
 
@@ -22,7 +23,7 @@ COPY --from=build /workspace/extracted/spring-boot-loader/ ./
 COPY --from=build /workspace/extracted/snapshot-dependencies/ ./
 COPY --from=build /workspace/extracted/application/ ./
 
-USER spring:spring
+USER 10001:10001
 
 ENV SERVER_PORT=8080 \
     JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
