@@ -151,7 +151,8 @@ jobs:
         run: docker push "$IMAGE"
 
       - name: Summary
-        run: echo "### ${{ matrix.service }}: \`$IMAGE\`" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "### ${{ matrix.service }}: \`$IMAGE\`" >> "$GITHUB_STEP_SUMMARY"
 
   # The single check that branch protection requires
   ci-status:
