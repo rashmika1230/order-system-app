@@ -49,7 +49,7 @@ public class ProductController {
     @PostMapping("/{id}/reserve")
     public ReserveStockResponse reserveStock(
         @PathVariable Long id,
-        @Valid
+//        @Valid
         @RequestBody ReserveStockRequest request){
         return productService.reserveStock(id, request.quantity());
     }
