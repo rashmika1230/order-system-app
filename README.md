@@ -1,43 +1,118 @@
-# Order System
+# Order System: Spring Boot microservices with a production-style GitOps pipeline
 
-A Spring Boot microservices project with a production-style DevOps pipeline:
-GitHub Actions, Terraform, k3s on AWS, ArgoCD and Prometheus/Grafana.
+Three Spring Boot services deployed to AWS through a fully automated, reviewed pipeline:
+**GitHub Actions → Amazon ECR → pull request → Argo CD → k3s**, with infrastructure in
+Terraform and monitoring with Prometheus and Grafana.
 
-## Services
+The business logic is deliberately small. The focus is on how a change gets from a
+developer's laptop to production safely, and how the system behaves when things go wrong.
 
-- **api-gateway**: single entry point, routes requests
-- **product-service**: manages products and stock
-- **order-service**: places orders, calls product-service
+> The AWS environment was torn down after the project. All infrastructure is code, so it can
+> be recreated with `terraform apply`. Screenshots below were taken from the running system.
 
-## Status
+## Architecture
 
-Work in progress.
+```mermaid
+flowchart LR
+    U[Client] -->|HTTP /api| T[Traefik ingress]
+    subgraph AWS["AWS us-east-1"]
+      subgraph EC2["EC2 · k3s"]
+        T --> G[api-gateway]
+        G --> P[product-service]
+        G --> O[order-service]
+        O -->|reserve stock| P
+        A[Argo CD]
+        M[Prometheus · Grafana · Alertmanager]
+      end
+      R[(RDS MySQL 8.4<br/>private subnets)]
+      E[(Amazon ECR)]
+    end
+    P --> R
+    O --> R
+```
 
-## Running locally
+| Service | Responsibility |
+|---|---|
+| **api-gateway** | Spring Cloud Gateway. Single public entry point; only allow-listed routes are exposed |
+| **product-service** | Products and stock. Atomic stock reservation |
+| **order-service** | Places orders by reserving stock in product-service; stores a price snapshot |
 
-Prerequisites: Java 17, Docker Desktop.
+## Delivery pipeline
 
-1. Copy `.env.example` to `.env` and set a root password
-2. Start MySQL: `docker compose up -d`
-3. Start the services (each in its own terminal):
-    - `cd product-service && ./mvnw spring-boot:run`  (port 8081)
-    - `cd order-service && ./mvnw spring-boot:run`    (port 8082)
-    - `cd api-gateway && ./mvnw spring-boot:run`      (port 8080)
-4. Call the API through the gateway at `http://localhost:8080`.
-   Example requests are in each service's `http/` folder.
+```mermaid
+flowchart LR
+    PR[PR to order-system-app] --> CI[CI: tests incl. Testcontainers]
+    CI -->|merge| B[Build image → Trivy scan → push to ECR<br/>tag = commit SHA]
+    B --> HPR[CI opens PR in order-system-helm]
+    HPR -->|human approval| ARGO[Argo CD syncs main]
+    ARGO --> K8S[Rolling update on k3s]
+```
 
-Only `/api/products`, `/api/products/{id}`, `/api/orders` and `/api/orders/{id}` are public.
-The stock reservation endpoint is internal (order-service → product-service only).
+- **Path-filtered:** only the services that changed are tested, built and deployed
+- **No stored AWS keys:** GitHub Actions authenticates with OIDC; the IAM role trusts only `main` of this repository
+- **Scan before push:** an image with a fixable critical vulnerability never reaches ECR
+- **Approval gate:** production changes only when a deployment PR is merged. Rollback = revert that PR
+- **Supply-chain safety:** every GitHub Action is pinned to a commit SHA and kept current by Dependabot
 
-### Run everything in Docker
+## Repositories
 
-Requires only Docker Desktop (no local Java needed).
+| Repository | Contents |
+|---|---|
+| [order-system-app](https://github.com/rashmika1230/order-system-app) | Service code, tests, Dockerfiles, CI pipeline (this repo) |
+| [order-system-helm](https://github.com/rashmika1230/order-system-helm) | Helm chart, environment values, Argo CD and monitoring configuration |
+| [order-system-infra](https://github.com/rashmika1230/order-system-infra) | Terraform: VPC, EC2/k3s, RDS, ECR, IAM, GitHub OIDC |
 
+## Tech stack
+
+**Application:** Java 17, Spring Boot 4.1, Spring Cloud Gateway, Spring Data JPA, Flyway, MySQL 8.4, HTTP interface clients<br>
+**Testing:** JUnit 5, Mockito, `@WebMvcTest`, Testcontainers (real MySQL)<br>
+**Delivery:** Docker (multi-stage, non-root), GitHub Actions, Trivy, Amazon ECR, Helm, Argo CD<br>
+**Infrastructure:** Terraform (S3 backend with native locking), AWS VPC, EC2, RDS, IAM, SSM, k3s<br>
+**Observability:** Micrometer, Prometheus, Grafana, Alertmanager
+
+## Engineering decisions
+
+- **Database per service.** Each service has its own schema and its own MySQL user; one service cannot read the other's data
+- **Atomic stock reservation.** One `UPDATE ... WHERE stock >= ?` prevents overselling under concurrency, proven by a 10-thread integration test
+- **No transaction around network calls.** `createOrder` calls product-service outside a DB transaction, so a slow dependency cannot exhaust the connection pool
+- **Timeouts and graceful degradation.** If product-service is down, order-service returns a clean `503`, not a stack trace
+- **Defence in depth.** RDS in private subnets reachable only from the node's security group; Kubernetes API open only to the admin IP; no SSH (SSM Session Manager); containers run as non-root with a read-only filesystem
+- **Secrets never in Git.** DB passwords are generated by Terraform into SSM Parameter Store; the RDS master password is managed by Secrets Manager
+
+## Proven by breaking it
+
+| Test | What happened |
+|---|---|
+| Removed input validation in a PR | Regression test failed, merge blocked by branch protection |
+| Scaled product-service to zero | Orders returned `503`; `OrderSystemServiceUnavailable` and `OrderSystemHighErrorRate` alerts fired |
+| Manual `kubectl scale` in production | Argo CD self-healed back to the state in Git |
+| Reverted a deployment PR | Argo CD rolled back; the database stayed compatible because migrations are backward-compatible |
+
+![CI run](docs/images/ci-run.png)
+![Argo CD](docs/images/argocd-tree.png)
+![Firing alerts](docs/images/alert-firing.png)
+
+## Problems I ran into and solved
+
+- **GitHub's 2026 OIDC change.** New repositories now send an immutable subject claim (`owner@id/repo@id`), so the IAM trust policy rejected the token. Diagnosed it and updated the trust policy to the new format
+- **Argo CD and Helm hooks.** kube-prometheus-stack's admission-webhook Jobs looped forever, because Argo CD re-runs Helm hooks on every sync and treated the patched webhooks as drift
+- **Grafana OOMKilled.** A memory limit set by guesswork caused a restart loop and a failed rollout; fixed using measured usage
+- **`runAsNonRoot` failed** with a named user in the image; switched to a numeric UID
+- **Wrong kubectl context.** A stale kubeconfig pointed at an old EKS cluster; now I check `current-context` before any change
+- **Exposed credential.** A database admin password was exposed during debugging; I rotated it through Secrets Manager and changed my workflow so secrets are never displayed
+- **Trivy supply-chain incident (March 2026).** Pinned all actions to commit SHAs instead of movable tags
+
+## Known limitations and next steps
+
+- Stock is not released if saving an order fails after a successful reservation (Saga pattern / compensating action)
+- Single node, single AZ, HTTP only (no domain); would move to EKS or multi-node with TLS via cert-manager
+- Alertmanager → Slack routing, External Secrets Operator, SonarCloud, and a Terraform plan/apply pipeline
+
+## Run locally
+
+Prerequisites: Docker Desktop.
+
+    cp .env.example .env
     docker compose --profile app up -d --build
 
-The API is available through the gateway at `http://localhost:8080`.
-product-service and order-service are not exposed outside the Docker network.
-
-Stop everything (data is kept in the `mysql-data` volume):
-
-    docker compose --profile app down
+API at `http://localhost:8080/api/products`.
