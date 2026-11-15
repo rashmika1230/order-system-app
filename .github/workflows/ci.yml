@@ -154,11 +154,67 @@ jobs:
         run: |
           echo "### ${{ matrix.service }}: \`$IMAGE\`" >> "$GITHUB_STEP_SUMMARY"
 
+  update-helm:
+    name: Open deployment PR in order-system-helm
+    needs: [changes, build-scan-push]
+    if: github.event_name == 'push' && needs.changes.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the Helm repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rashmika1230/order-system-helm
+          token: ${{ secrets.HELM_REPO_TOKEN }}
+          path: helm
+
+      - name: Update image tags in environments/prod/values.yaml
+        working-directory: helm
+        env:
+          SERVICES: ${{ needs.changes.outputs.services }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          for svc in $(echo "$SERVICES" | jq -r '.[]'); do
+            yq -i ".services.\"$svc\".image.tag = \"$IMAGE_TAG\"" environments/prod/values.yaml
+          done
+          git diff
+
+      - name: Commit and open a pull request
+        working-directory: helm
+        env:
+          GH_TOKEN: ${{ secrets.HELM_REPO_TOKEN }}
+          SERVICES: ${{ needs.changes.outputs.services }}
+          IMAGE_TAG: ${{ github.sha }}
+          SOURCE_COMMIT: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+          SOURCE_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          if git diff --quiet; then
+            echo "Image tags are already up to date, nothing to deploy"
+            exit 0
+          fi
+
+          short_sha="${IMAGE_TAG:0:7}"
+          services_list=$(echo "$SERVICES" | jq -r 'join(", ")')
+          branch="deploy/${short_sha}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "deploy(prod): ${services_list} @ ${short_sha}"
+          git push --force -u origin "$branch"
+
+          if gh pr view "$branch" > /dev/null 2>&1; then
+            echo "A pull request for $branch already exists"
+          else
+            gh pr create --base main --head "$branch" \
+              --title "deploy(prod): ${services_list} @ ${short_sha}" \
+              --body "$(printf 'Updates the production image tag for: **%s**\n\nSource commit: %s\n\n> %s\n\nMerging this PR deploys to production: Argo CD syncs the main branch.' "$services_list" "$SOURCE_COMMIT" "$SOURCE_MESSAGE")"
+          fi
+
   # The single check that branch protection requires
   ci-status:
     name: CI status
     if: always()
-    needs: [changes, test, build-scan-push]
+    needs: [changes, test, build-scan-push,update-helm]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any job failed or was cancelled
